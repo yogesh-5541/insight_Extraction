@@ -1,0 +1,62 @@
+# ===============================
+# Python Virtual Environments
+# ===============================
+venv/
+.env/
+.venv/
+
+# ===============================
+# Python Cache Files
+# ===============================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ===============================
+# Pytest / Testing
+# ===============================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ===============================
+# Build / Packaging
+# ===============================
+build/
+dist/
+*.egg-info/
+langextract.egg-info/
+
+# ===============================
+# Logs
+# ===============================
+*.log
+
+# ===============================
+# IDE / Editor Files
+# ===============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===============================
+# OS Generated Files
+# ===============================
+.DS_Store
+Thumbs.db
+
+# ===============================
+# Environment / Secrets
+# ===============================
+.env.local
+.env.dev
+.env.prod
+
+# ===============================
+# Benchmarks / Temporary Output
+# ===============================
+benchmarks/output/
+tmp/
+temp/

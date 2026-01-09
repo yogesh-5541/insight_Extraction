@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Text Insight Extraction</title>
+    <style>
+        body {
+            font-family: Arial;
+            margin: 40px;
+        }
+        textarea {
+            width: 80%;
+            height: 120px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-top: 10px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Cloud-Based Text Data Analysis</h2>
+
+<form id="extractForm">
+    <textarea id="textInput" placeholder="Enter text here..."></textarea><br>
+    <button type="submit">Extract Insights</button>
+</form>
+
+<h3>Result</h3>
+<pre id="result"></pre>
+
+<script>
+document.getElementById("extractForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const text = document.getElementById("textInput").value;
+
+    const response = await fetch("/extract", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text})
+    });
+
+    const data = await response.json();
+    document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+});
+</script>
+
+</body>
+</html>
