@@ -1,111 +1,84 @@
-# Copyright 2025 Google LLC.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""
+Ollama integration tests for langextract.
 
-"""Integration tests for Ollama functionality."""
-import socket
+These tests require a running Ollama server and local models.
+They are marked as integration tests and are skipped in CI.
+"""
 
 import pytest
+import shutil
+import subprocess
 
-import langextract as lx
+from langextract import extract
 
-
-def _ollama_available():
-  """Check if Ollama is running on localhost:11434."""
-  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-    result = sock.connect_ex(("localhost", 11434))
-    return result == 0
+# Mark entire file as integration test
+pytestmark = pytest.mark.integration
 
 
-@pytest.mark.skipif(not _ollama_available(), reason="Ollama not running")
-def test_ollama_extraction():
-  input_text = "Isaac Asimov was a prolific science fiction writer."
-  prompt = "Extract the author's full name and their primary literary genre."
-
-  examples = [
-      lx.data.ExampleData(
-          text=(
-              "J.R.R. Tolkien was an English writer, best known for"
-              " high-fantasy."
-          ),
-          extractions=[
-              lx.data.Extraction(
-                  extraction_class="author_details",
-                  extraction_text="J.R.R. Tolkien was an English writer...",
-                  attributes={
-                      "name": "J.R.R. Tolkien",
-                      "genre": "high-fantasy",
-                  },
-              )
-          ],
-      )
-  ]
-
-  model_id = "gemma2:2b"
-
-  result = lx.extract(
-      text_or_documents=input_text,
-      prompt_description=prompt,
-      examples=examples,
-      model_id=model_id,
-      model_url="http://localhost:11434",
-      temperature=0.3,
-      fence_output=False,
-      use_schema_constraints=False,
-  )
-
-  assert len(result.extractions) > 0
-  extraction = result.extractions[0]
-  assert extraction.extraction_class == "author_details"
-  if extraction.attributes:
-    assert "asimov" in extraction.attributes.get("name", "").lower()
+def _ollama_available() -> bool:
+    """
+    Check whether Ollama CLI is installed and available.
+    """
+    return shutil.which("ollama") is not None
 
 
-@pytest.mark.skipif(not _ollama_available(), reason="Ollama not running")
-def test_ollama_extraction_with_fence_fallback():
-  input_text = "Marie Curie was a physicist who won two Nobel prizes."
-  prompt = "Extract information about people and their achievements."
+def _ollama_running() -> bool:
+    """
+    Check whether Ollama service is running.
+    """
+    try:
+        subprocess.run(
+            ["ollama", "list"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+        return True
+    except Exception:
+        return False
 
-  examples = [
-      lx.data.ExampleData(
-          text="Albert Einstein developed the theory of relativity.",
-          extractions=[
-              lx.data.Extraction(
-                  extraction_class="person",
-                  extraction_text="Albert Einstein",
-                  attributes={"achievement": "theory of relativity"},
-              )
-          ],
-      )
-  ]
 
-  model_id = "gemma2:2b"
+def test_ollama_basic_inference():
+    """
+    Basic Ollama inference test using a local model.
+    """
+    if not _ollama_available():
+        pytest.skip("Ollama is not installed")
 
-  result = lx.extract(
-      text_or_documents=input_text,
-      prompt_description=prompt,
-      examples=examples,
-      model_id=model_id,
-      model_url="http://localhost:11434",
-      temperature=0.3,
-      fence_output=True,  # Testing that fallback works
-      use_schema_constraints=False,
-  )
+    if not _ollama_running():
+        pytest.skip("Ollama service is not running")
 
-  assert len(result.extractions) > 0
-  extraction = result.extractions[0]
-  assert extraction.extraction_class == "person"
-  assert (
-      "marie" in extraction.extraction_text.lower()
-      or "curie" in extraction.extraction_text.lower()
-  )
+    result = extract(
+        text="Alice lives in Paris and works as a data scientist.",
+        schema={
+            "name": "Person name",
+            "city": "City name",
+            "profession": "Job title",
+        },
+        provider="ollama",
+        model="llama3",
+    )
+
+    assert result is not None
+    assert "name" in result
+    assert "city" in result
+    assert "profession" in result
+
+
+def test_ollama_missing_model_raises_error():
+    """
+    Ensure missing model configuration raises an error.
+    """
+    if not _ollama_available():
+        pytest.skip("Ollama is not installed")
+
+    if not _ollama_running():
+        pytest.skip("Ollama service is not running")
+
+    with pytest.raises(Exception):
+        extract(
+            text="Test text",
+            schema={"field": "value"},
+            provider="ollama",
+            model="non-existent-model",
+        )

@@ -1,58 +1,83 @@
-#!/usr/bin/env python3
-# Copyright 2025 Google LLC.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""
+Example custom provider plugin tests for langextract.
 
-"""Simple test for the custom provider plugin."""
+This file demonstrates how a third-party or external provider plugin
+can be registered and used with langextract.
 
-import os
+These tests are OPTIONAL and are skipped in CI environments unless
+the example plugin is explicitly installed.
+"""
 
-import dotenv
-# Import the provider to trigger registration with LangExtract
-# Note: This manual import is only needed when running without installation.
-# After `pip install -e .`, the entry point system handles this automatically.
-from langextract_provider_example import CustomGeminiProvider  # noqa: F401
+import pytest
 
-import langextract as lx
+from langextract.core.exceptions import InferenceConfigError
+
+# Mark entire file as optional plugin test
+pytestmark = pytest.mark.optional
 
 
-def main():
-  """Test the custom provider."""
-  dotenv.load_dotenv(override=True)
-  api_key = os.getenv("GEMINI_API_KEY") or os.getenv("LANGEXTRACT_API_KEY")
-
-  if not api_key:
-    print("Set GEMINI_API_KEY or LANGEXTRACT_API_KEY to test")
-    return
-
-  config = lx.factory.ModelConfig(
-      model_id="gemini-2.5-flash",
-      provider="CustomGeminiProvider",
-      provider_kwargs={"api_key": api_key},
-  )
-  model = lx.factory.create_model(config)
-
-  print(f"✓ Created {model.__class__.__name__}")
-
-  # Test inference
-  prompts = ["Say hello"]
-  results = list(model.infer(prompts))
-
-  if results and results[0]:
-    print(f"✓ Inference worked: {results[0][0].output[:50]}...")
-  else:
-    print("✗ No response")
+def _plugin_available() -> bool:
+    """
+    Check whether the example plugin is available.
+    """
+    try:
+        import langextract_example_plugin  # type: ignore
+        return True
+    except ModuleNotFoundError:
+        return False
 
 
-if __name__ == "__main__":
-  main()
+def test_example_provider_is_registered():
+    """
+    Ensure example provider is registered when plugin is installed.
+    """
+    if not _plugin_available():
+        pytest.skip("Example provider plugin not installed")
+
+    from langextract.providers import get_provider
+
+    provider_cls = get_provider("example")
+    assert provider_cls is not None
+
+
+def test_example_provider_inference():
+    """
+    Test inference using the example provider.
+    """
+    if not _plugin_available():
+        pytest.skip("Example provider plugin not installed")
+
+    from langextract import extract
+
+    result = extract(
+        text="Suresh works as a Mechanical Engineer in Chennai.",
+        schema={
+            "name": "Person name",
+            "profession": "Job title",
+            "city": "City name",
+        },
+        provider="example",
+    )
+
+    assert result is not None
+    assert "name" in result
+    assert "profession" in result
+    assert "city" in result
+
+
+def test_example_provider_missing_configuration_raises_error():
+    """
+    Ensure provider raises a clear error when configuration is missing.
+    """
+    if not _plugin_available():
+        pytest.skip("Example provider plugin not installed")
+
+    from langextract import extract
+
+    with pytest.raises(InferenceConfigError):
+        extract(
+            text="Test text",
+            schema={"field": "value"},
+            provider="example",
+            config=None,
+        )
